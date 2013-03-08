@@ -15,10 +15,10 @@
   "keywords": ["framework", "sinatra", "web", "rest", "restful"],
   "repository": "git://github.com/trarck/yhnode",
   "main": "index",
-  "bin": { "express": "./bin/express" },
+  "bin": { "yhnode": "./bin/yhnode" },
   "scripts": {
     "test": "make test",
     "prepublish" : "npm prune"
   },
-  "engines": { "node": ">= 0.4.1 < 0.7.0" }
+  "engines": { "node": ">= 0.4.1" }
 }
