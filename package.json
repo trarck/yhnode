@@ -1,0 +1,24 @@
+{
+  "name": "YHNode",
+  "description": "nodejs lib",
+  "version": "0.0.1",
+  "author": "trarck <trarck@gmail.com>",
+  "contributors": [ 
+    
+  ],
+  "dependencies": {
+    
+  },
+  "devDependencies": {
+    
+  },
+  "keywords": ["framework", "sinatra", "web", "rest", "restful"],
+  "repository": "git://github.com/trarck/yhnode",
+  "main": "index",
+  "bin": { "express": "./bin/express" },
+  "scripts": {
+    "test": "make test",
+    "prepublish" : "npm prune"
+  },
+  "engines": { "node": ">= 0.4.1 < 0.7.0" }
+}
