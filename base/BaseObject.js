@@ -9,7 +9,11 @@ BaseObject.prototype.initialize=function(){
 
 BaseObject.extend=function(overrides,content,exts){
 	if(exts){
-		exts.unshift(this);
+		if(exts instanceof Array){
+			exts.unshift(this);
+		}else{
+			exts=[this,exts];
+		}
 	}else{
 		exts=[this];
 	}
