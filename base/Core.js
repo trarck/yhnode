@@ -237,7 +237,10 @@ var Core={
         // Get the tag
         var target = arguments[0];
         var i = 1;
-        if ( typeof target === "boolean" ) {
+		/*support deep number*/
+        // if ( typeof target === "boolean" || typeof target== "number") {
+        //     deep = target<0?false:target;
+        if (  typeof target === "boolean") {
             deep = target;
             target = arguments[1] || {};
             // skip the boolean and the target
@@ -268,7 +271,9 @@ var Core={
                             src=copy instanceof Array?[]:{};
                         }
                         // Never move original objects, clone them
-                        target[ name ] = this.mixin( deep, src, copy );
+						/*support deep number*/
+                        // target[ name ] = this.mixin( deep===true?true:deep-1, src, copy );
+						target[ name ] = this.mixin( deep, src, copy );
     
                     // Don't bring in undefined values
                     } else if ( copy !== undefined ) {
@@ -291,12 +296,18 @@ var Core={
         // Get the tag
         var target = arguments[0];
         var i = 1;
-        if ( typeof target === "boolean" ) {
+		/*support deep number*/
+        // if ( typeof target === "boolean" || typeof target== "number") {
+        //     deep = target<0?false:target;
+			
+        if ( typeof target === "boolean") {
             deep = target;
             target = arguments[1] || {};
             // skip the boolean and the target
             i = 2;
+			
         }
+		
         // Ensure we have an extendable target
         if(typeof target != 'object' && typeof target != 'function') {
             target = {};
@@ -324,18 +335,56 @@ var Core={
                             src=copy instanceof Array?[]:{};
                         }
                         // Never move original objects, clone them
+						/*support deep number*/
+                        // target[ name ] = this.mixin( deep===true?true:deep-1, src, copy );
                         target[ name ] = this.mixinIf( deep, src, copy );
     
                     // Don't bring in undefined values
                     } else if ( !src && copy !== undefined ) {
                         target[ name ] = copy;
-                    }
+                    }	
                 }
             }
         }
         // Pass it back
         return target;
     },
+	clone:function(obj){
+		return this.mixin({},obj);
+	},
+	
+	deepClone:function(obj,deep){
+
+		if(obj==null) return null;
+		
+        var target = obj instanceof Array?[]:{};
+        deep=deep<0?0:deep;
+
+        var src,copy;
+        
+        // Extend the base object
+        for ( var name in obj ) {
+            if(name=="_super_" ||name=="_superclass_") continue;
+                    
+            copy = obj[ name ];
+            // Prevent never-ending loop
+            if ( copy==null||target === copy ) {
+                continue;
+            }
+            // Recurse if we're merging plain objects or arrays
+            if ( deep && typeof copy == 'object' ) {
+                // Never move original objects, clone them
+                target[ name ] = this.deepClone(copy,deep-1);
+                // Don't bring in undefined values
+            } else if ( copy !== undefined ) {
+                target[ name ] = copy;
+            }
+        }
+        // Pass it back
+        return target;
+		
+	},
+	
     isPlainObject:function( obj ) {
         // Must be an Object.
         // Because of IE, we also have to check the presence of the constructor property.
