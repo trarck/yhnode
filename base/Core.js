@@ -349,8 +349,9 @@ var Core={
         // Pass it back
         return target;
     },
+	
 	clone:function(obj){
-		return this.mixin({},obj);
+		return this.mixin(obj instanceof Array?[]:{},obj);
 	},
 	
 	deepClone:function(obj,deep){
