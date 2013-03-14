@@ -13,6 +13,7 @@ var ArgParser=exports.ArgParser=function(){
     this._optionDisplayStartColumn=2;
     this._betweenShortAndLongDisplayColumn=1;
     this._betweenCmdAndDescriptionDisplayColumn=1;
+	this._supportUnknownOptions=false;
 };
 
 //ArgParser.prototype.setLongOpts=function(longOptions){
@@ -54,7 +55,14 @@ ArgParser.prototype.getBetweenCmdAndDescriptionDisplayColumn=function() {
     return this._betweenCmdAndDescriptionDisplayColumn;
 };
 
+ArgParser.prototype.setSupportUnknownOptions=function(value){
+	this._supportUnknownOptions=value;
+	return this;
+};
 
+ArgParser.prototype.isSupportUnknownOptions=function(){
+	return this._supportUnknownOptions;
+};
 
 /**
  * {
@@ -112,20 +120,24 @@ ArgParser.prototype.parse=function(args) {
         arg = args.shift();
         if (arg.indexOf('--') == 0) {
             argItems = arg.split('=');
-            opt= this.longOptions[argItems[0].substr(2)];
+			argName=argItems[0].substr(2);
+            opt= this.longOptions[argName];
             if (opt) {
                 opts[opt.name] =this.getOptValue(opt,argItems[1]);
-            }
-            else {
+            }else if(this._supportUnknownOptions){
+				opts[argName]=this.handleUnknownOptionValue(argItems[1]);
+			}else {
                 throw new Error('Unknown option "' + argItems[0] + '"');
             }
         }
         else if (arg.indexOf('-') == 0) {
-            opt= this.shortOptions[arg.substr(1)];
+			argName=arg.substr(1);
+            opt= this.shortOptions[argName];
             if (opt) {
                 opts[opt.name] = this.getOptValue(opt,(!args[0] || (args[0].indexOf('-') == 0)) ? null : args.shift());
-            }
-            else {
+            }else if(this._supportUnknownOptions){
+				opts[argName]=this.handleUnknownOptionValue((!args[0] || (args[0].indexOf('-') == 0)) ? null : args.shift());
+            }else {
                 throw new Error('Unknown option "' + arg + '"');
             }
         }
@@ -152,6 +164,20 @@ ArgParser.prototype.typeHandles={
     booleanHandle:function(v){
         return typeof v=="string"? (v=="false"?false:true):v;
     }
+};
+
+ArgParser.prototype.handleUnknownOptionValue=function(value){
+	var n;
+	//to number
+	n=parseFloat(value);
+	if(!isNaN(n)) return n;
+	
+	//check true,false
+	if(value=="true") return true;
+	if(value=="false") return false;
+	
+	return value;
+	
 };
 
 //===========for usage=============//
@@ -233,8 +259,9 @@ ArgParser.prototype.getOptionCmdDisplayLength=function(option){
     return len;
 };
 
-ArgParser.parse=function(options){
+ArgParser.parse=function(options,supportUnknowOptions){
     var argParser = new ArgParser();
+	argParser.setSupportUnknownOptions(supportUnknowOptions);
     argParser.setOpts(options);
     var ret=argParser.parse(argParser.getDefaultArgs());
     ret.usage=argParser.createUsageOptions();
@@ -246,11 +273,11 @@ ArgParser.repeat=function(c,len){
 };
 
 //=====test====//
-//
-//var args=process.argv.slice(2);
-//console.log(args);
-//
-//var opts= [
+
+// var args=process.argv.slice(2);
+// console.log(args);
+// 
+// var opts= [
 //    { full: 'directory'
 //        , abbr: 'C'
 //    }
@@ -276,7 +303,8 @@ ArgParser.repeat=function(c,len){
 //        abbr: 'd',
 //        type:"boolean"
 //    }
-//];
-//var argParser=new ArgParser();
-//argParser.setOpts(opts);
-//console.log(argParser.parse(args));
+// ];
+// var argParser=new ArgParser();
+// argParser.setSupportUnknownOptions(true);
+// argParser.setOpts(opts);
+// console.log(argParser.parse(args));
