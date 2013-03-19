@@ -6,6 +6,8 @@ var https = require('https');
 var urlParse = require("url").parse;
 var events = require("events");
 
+var Headers=require('./Headers').Headers;
+
 var defaultHeaders = {
     "User-Agent":"HttpRequest",
     "Accept":"*/*"
@@ -82,7 +84,7 @@ var HttpRequest = BaseObject.extend({
      */
     initialize:function () {
 
-        this._headers={};
+        this._headers=new Headers();
 
         this.onreadystatechange = null;
 
@@ -90,9 +92,9 @@ var HttpRequest = BaseObject.extend({
 
         this._settings={};
 
-        var client;
-        var request;
-        var response;
+        this._request=null;
+
+        this._response=null;
 
     },
 
@@ -135,16 +137,7 @@ var HttpRequest = BaseObject.extend({
             return;
         }
 
-        if(this._headers[header]){
-            var oldValue=this._headers[header];
-            if(oldValue instanceof Array){
-                oldValue.push(value);
-            }else{
-                this._headers[header]=[oldValue,value];
-            }
-        }else{
-            this._headers[header] = value;
-        }
+        this._headers.push(header,value);
     },
 
     /**
@@ -156,10 +149,10 @@ var HttpRequest = BaseObject.extend({
     getResponseHeader:function (header) {
         if (typeof header === "string"
             && this.readyState > HttpStatus.OPENED
-            && response.headers[header.toLowerCase()]
+            && this._response.headers[header.toLowerCase()]
             && !this._errorFlag
             ) {
-            return response.headers[header.toLowerCase()];
+            return this._response.headers[header.toLowerCase()];
         }
 
         return null;
@@ -176,10 +169,10 @@ var HttpRequest = BaseObject.extend({
         }
         var result = "";
 
-        for (var i in response.headers) {
+        for (var i in this._response.headers) {
             // Cookie this._headers are excluded
             if (i !== "set-cookie" && i !== "set-cookie2") {
-                result += i + ": " + response.headers[i] + "\r\n";
+                result += i + ": " + this._response.headers[i] + "\r\n";
             }
         }
         return result.substr(0, result.length - 2);
@@ -192,13 +185,19 @@ var HttpRequest = BaseObject.extend({
      * @return string Returns the request header or empty string if not set
      */
     getRequestHeader:function (name) {
-        // @TODO Make this case insensitive
         if (typeof name === "string" && this._headers[name]) {
-            var value=this._headers[name]
+            var value=this._headers[name];
             return value instanceof Array?value.join(", "):value;
         }
 
         return "";
+    },
+
+    overrideMimeType:function(mime){
+        if (this.readyState == HttpStatus.LOADING || this.readyState==HttpStatus.DONE) {
+            throw "INVALID_STATE_ERR: overrideMimeType can only be called when state is OPEN";
+        }
+        this._overrideMimeType=mime;
     },
 
     /**
@@ -207,12 +206,13 @@ var HttpRequest = BaseObject.extend({
      * @param string data Optional data to send as request body.
      */
     send:function (data) {
+        var self=this;
         if (this.readyState != HttpStatus.OPENED) {
-            throw "INVALID_STATE_ERR: connection must be opened before send() is called";
+            throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");
         }
 
         if (this._sendFlag) {
-            throw "INVALID_STATE_ERR: send has already been called";
+            throw new Error("INVALID_STATE_ERR: send has already been called");
         }
 
         var ssl = false, local = false;
@@ -253,7 +253,7 @@ var HttpRequest = BaseObject.extend({
                     } else {
                         self.status = 200;
                         self.responseText = data;
-                        this.setState(HttpStatus.DONE);
+                        self.setState(HttpStatus.DONE);
                     }
                 });
             } else {
@@ -310,7 +310,7 @@ var HttpRequest = BaseObject.extend({
             port:port,
             path:uri,
             method:this._settings.method,
-            this._headers:this._headers,
+            headers:this._headers,
             agent:false
         };
 
@@ -329,34 +329,43 @@ var HttpRequest = BaseObject.extend({
             self.dispatchEvent("readystatechange");
 
             // Create the request
-            request = doRequest(options,
+            this._request = doRequest(options,
                 function (resp) {
-                    response = resp;
-                    response.setEncoding("utf8");
+
+                    self._response = resp;
+
+                    var encoding="utf8";
+                    if(self._overrideMimeType) {
+                        resp.headers['Content-Type']=self._overrideMimeType;
+                        encoding=self.getResponseEncoding();
+                    }
+
+                    resp.setEncoding(encoding);
 
                     this.setState(HttpStatus.HEADERS_RECEIVED);
-                    self.status = response.statusCode;
 
-                    response.on('data', function (chunk) {
+                    self.status = resp.statusCode;
+
+                    resp.on('data', function (chunk) {
                         // Make sure there's some data
                         if (chunk) {
                             self.responseText += chunk;
                         }
                         // Don't emit state changes if the connection has been aborted.
-                        if (this._sendFlag) {
-                            this.setState(HttpStatus.LOADING);
+                        if (self._sendFlag) {
+                            self.setState(HttpStatus.LOADING);
                         }
                     });
 
-                    response.on('end', function () {
-                        if (this._sendFlag) {
+                    resp.on('end', function () {
+                        if (self._sendFlag) {
                             // Discard the 'end' event if the connection has been aborted
-                            this.setState(HttpStatus.DONE);
-                            this._sendFlag = false;
+                            self.setState(HttpStatus.DONE);
+                            self._sendFlag = false;
                         }
                     });
 
-                    response.on('error', function (error) {
+                    resp.on('error', function (error) {
                         self.handleError(error);
                     });
                 }).on('error', function (error) {
@@ -365,58 +374,59 @@ var HttpRequest = BaseObject.extend({
 
             // Node 0.4 and later won't accept empty data. Make sure it's needed.
             if (data) {
-                request.write(data);
+                this._request.write(data);
             }
 
-            request.end();
+            this._request.end();
 
-            self.dispatchEvent("loadstart");
+            this.dispatchEvent("loadstart");
         } else { // Synchronous
-            // Create a temporary file for communication with the other Node process
-            var syncFile = ".node-xmlhttprequest-sync-" + process.pid;
-            fs.writeFileSync(syncFile, "", "utf8");
-            // The async request the other Node process executes
-            var execString = "var http = require('http'), https = require('https'), fs = require('fs');"
-                + "var doRequest = http" + (ssl ? "s" : "") + ".request;"
-                + "var options = " + JSON.stringify(options) + ";"
-                + "var responseText = '';"
-                + "var req = doRequest(options, function(response) {"
-                + "response.setEncoding('utf8');"
-                + "response.on('data', function(chunk) {"
-                + "responseText += chunk;"
-                + "});"
-                + "response.on('end', function() {"
-                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-STATUS:' + response.statusCode + ',' + responseText, 'utf8');"
-                + "});"
-                + "response.on('error', function(error) {"
-                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-ERROR:' + JSON.stringify(error), 'utf8');"
-                + "});"
-                + "}).on('error', function(error) {"
-                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-ERROR:' + JSON.stringify(error), 'utf8');"
-                + "});"
-                + (data ? "req.write('" + data.replace(/'/g, "\\'") + "');" : "")
-                + "req.end();";
-            // Start the other Node Process, executing this string
-            syncProc = spawn(process.argv[0], ["-e", execString]);
-            while ((self.responseText = fs.readFileSync(syncFile, 'utf8')) == "") {
-                // Wait while the file is empty
-            }
-            // Kill the child process once the file has data
-            syncProc.stdin.end();
-            // Remove the temporary file
-            fs.unlinkSync(syncFile);
-            if (self.responseText.match(/^NODE-XMLHTTPREQUEST-ERROR:/)) {
-                // If the file returned an error, handle it
-                var errorObj = self.responseText.replace(/^NODE-XMLHTTPREQUEST-ERROR:/, "");
-                self.handleError(errorObj);
-            } else {
-                // If the file returned okay, parse its data and move to the DONE state
-                self.status = self.responseText.replace(/^NODE-XMLHTTPREQUEST-STATUS:([0-9]*),.*/, "$1");
-                self.responseText = self.responseText.replace(/^NODE-XMLHTTPREQUEST-STATUS:[0-9]*,(.*)/, "$1");
-                this.setState(HttpStatus.DONE);
-            }
+//            // Create a temporary file for communication with the other Node process
+//            var syncFile = ".node-xmlhttprequest-sync-" + process.pid;
+//            fs.writeFileSync(syncFile, "", "utf8");
+//            // The async request the other Node process executes
+//            var execString = "var http = require('http'), https = require('https'), fs = require('fs');"
+//                + "var doRequest = http" + (ssl ? "s" : "") + ".request;"
+//                + "var options = " + JSON.stringify(options) + ";"
+//                + "var responseText = '';"
+//                + "var req = doRequest(options, function(response) {"
+//                + "response.setEncoding('utf8');"
+//                + "response.on('data', function(chunk) {"
+//                + "responseText += chunk;"
+//                + "});"
+//                + "response.on('end', function() {"
+//                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-STATUS:' + response.statusCode + ',' + responseText, 'utf8');"
+//                + "});"
+//                + "response.on('error', function(error) {"
+//                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-ERROR:' + JSON.stringify(error), 'utf8');"
+//                + "});"
+//                + "}).on('error', function(error) {"
+//                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-ERROR:' + JSON.stringify(error), 'utf8');"
+//                + "});"
+//                + (data ? "req.write('" + data.replace(/'/g, "\\'") + "');" : "")
+//                + "req.end();";
+//            // Start the other Node Process, executing this string
+//            syncProc = spawn(process.argv[0], ["-e", execString]);
+//            while ((self.responseText = fs.readFileSync(syncFile, 'utf8')) == "") {
+//                // Wait while the file is empty
+//            }
+//            // Kill the child process once the file has data
+//            syncProc.stdin.end();
+//            // Remove the temporary file
+//            fs.unlinkSync(syncFile);
+//            if (self.responseText.match(/^NODE-XMLHTTPREQUEST-ERROR:/)) {
+//                // If the file returned an error, handle it
+//                var errorObj = self.responseText.replace(/^NODE-XMLHTTPREQUEST-ERROR:/, "");
+//                self.handleError(errorObj);
+//            } else {
+//                // If the file returned okay, parse its data and move to the DONE state
+//                self.status = self.responseText.replace(/^NODE-XMLHTTPREQUEST-STATUS:([0-9]*),.*/, "$1");
+//                self.responseText = self.responseText.replace(/^NODE-XMLHTTPREQUEST-STATUS:[0-9]*,(.*)/, "$1");
+//                this.setState(HttpStatus.DONE);
+//            }
         }
     },
+
 
     /**
      * Called when an error is encountered to deal with it.
@@ -433,9 +443,9 @@ var HttpRequest = BaseObject.extend({
      * Aborts a request.
      */
     abort:function () {
-        if (request) {
-            request.abort();
-            request = null;
+        if (this._request) {
+            this._request.abort();
+            this._request = null;
         }
 
         this._headers = defaultHeaders;
@@ -490,18 +500,19 @@ var HttpRequest = BaseObject.extend({
             }
         }
     },
+
     setState:function(state) {
         if (this.readyState !== state) {
             this.readyState = state;
 
             if (this._settings.async || this.readyState < HttpStatus.OPENED || this.readyState === HttpStatus.DONE) {
-                self.dispatchEvent("readystatechange");
+                this.dispatchEvent("readystatechange");
             }
 
-            if (self.readyState === HttpStatus.DONE && !this._errorFlag) {
-                self.dispatchEvent("load");
+            if (this.readyState === HttpStatus.DONE && !this._errorFlag) {
+                this.dispatchEvent("load");
                 // @TODO figure out InspectorInstrumentation::didLoadXHR(cookie)
-                self.dispatchEvent("loadend");
+                this.dispatchEvent("loadend");
             }
         }
     },
@@ -513,15 +524,39 @@ var HttpRequest = BaseObject.extend({
 
     getDisableHeaderCheck:function() {
         return this._disableHeaderCheck;
+    },
+
+    getResponseEncoding:function(){
+        var encoding="utf8";
+
+        var mimes=this._overrideMimeType.split(";");
+        var charset=mimes[1];
+        if(charset){
+            var charsets=charset.split("=");
+            switch(charsets[1].toLowerCase()){
+                case "utf-8":
+                    encoding="utf8";
+                    break;
+                default:
+                    encoding=charsets[1];
+                    break;
+            }
+        }
+
+        return encoding;
+    },
+
+    get response(){
+        return this._response;
     }
 
 }, {
     isAllowedHttpMethod:function (method) {
-        return (method && Methods[method] != null);
+        return (method && HttpMethods[method] != null);
     },
 
     isAllowedHttpHeader : function(header) {
         return (header && forbiddenRequestHeaders.indexOf(header.toLowerCase()) === -1);
     }
 
-}, events);
+});

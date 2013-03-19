@@ -1,20 +1,15 @@
-////////////////////////////////////////////////////////////////////////////////
-/**
- *  @author:    Mizuno Takaaki
- *  Website:    https://developer.mobage.com/
- *  Copyright:  (C) 2011-2012 ngmoco:) inc. All rights reserved.
- */
-////////////////////////////////////////////////////////////////////////////////
+var BaseObject = require('../../base/BaseObject').BaseObject;
 
-//////////////////////////////////////////////////////////////////////////////
-// Require Block
-var Class   = require('../../../Foundation/Class').Class;
-var Headers = require('./Headers').Headers;
+var ResponseType={
+    ArrayBuffer:"arraybuffer",
+    Blob:"blob",
+    Document:"document",
+    Json:"json",
+    Text:"text"
+};
 
+var Response = BaseObject.extend({
 
-var Response = Class.subclass(
-/** @lends Service.Network.HTTP.Response.prototype */
-{
     classname: 'Response',
     /**
      * @class class description
@@ -31,31 +26,68 @@ var Response = Class.subclass(
      * @property {ToBeWritten} headers (readonly)
      * @augments Core.Class
      */
-    initialize: function(xhr, req)
+    initialize: function(response)
     {
-        this._statusCode      = parseInt(xhr.status,10);
-        this._statusText      = xhr.statusText;
-        this._responseText    = xhr.responseText;
-        this._redirectHistory = req.redirectList;
-        this._headers         = this._buildHeaders(xhr);
-        this._uri             = req.uri;
+        this._originalResponse=response;
+
+        this._overrideMimeType=null;
+        this._overrideCharset=null;
+
+        this._responseText="";
+        this._type=ResponseType.Text;
     },
-    get statusCode()
-    {
-        return this._statusCode;
+
+    overrideMimeType:function(mime){
+        var mimes=mime.split(";");
+        this._overrideMimeType=mimes[0];
+        var charset=mimes[1];
+        if(charset){
+            var charsets=charset.split("=");
+            this._overrideCharset=charsets[1];
+        }
     },
-    set statusCode(value)
-    {
-        console.log("HTTP.Response: statusCode is a read only property.");
+
+    get mimeType(){
+        if(this._overrideMimeType){
+            return this._overrideMimeType;
+        }else{
+            var ct=this._headers['Content-Type'];
+            var mimes=ct.split(';');
+            return mimes[0];
+        }
     },
-    get statusText()
-    {
-        return this._statusText;
+
+    get charset(){
+        if(this._overrideCharset){
+            return this._overrideCharset;
+        }else{
+            var ct=this._headers['Content-Type'];
+            var mimes=ct.split(';');
+            return mimes[1];
+        }
     },
-    set statusText(value)
-    {
-        console.log("HTTP.Response: statusText is a read only property.");
+
+    set overrideMimeType(overrideMimeType){
+        this._overrideMimeType=overrideMimeType;
     },
+
+    set overrideCharset(overrideCharset){
+        this._overrideCharset=overrideCharset;
+    },
+
+    get encoding(){
+        var encoding="utf8";
+        switch(this._overrideCharset.toLowerCase()){
+            case "utf-8":
+                encoding="utf8";
+                break;
+            default:
+                encoding=this._overrideCharset;
+                break;
+        }
+        return encoding;
+    },
+
     /**
      * @field
      * @type String
@@ -85,7 +117,7 @@ var Response = Class.subclass(
     },
     get isText()
     {
-        return this._headers.contentIsText();
+        return this._type==ResponseType.Text;
     },
     set isText(value)
     {
@@ -93,7 +125,7 @@ var Response = Class.subclass(
     },
     get isJSON()
     {
-        return this._headers.contentIsJSON();
+        return this._type==ResponseType.Json;
     },
     set isJSON(value)
     {
@@ -101,26 +133,11 @@ var Response = Class.subclass(
     },
     get headers()
     {
-        return this._headers;
+        return this._originalResponse.headers;
     },
     set headers(value)
     {
         console.log("HTTP.Response: headers is a read only property.");
-    },
-    /** @private */
-    _buildHeaders: function(xhr)
-    {
-        var key;
-        var obj = xhr.getUnflattenedResponseHeaders();
-        var headers = new Headers();
-        for(key in obj)
-        {
-            if( obj.hasOwnProperty(key))
-            {
-                headers.set(key, obj[key]);
-            }
-        }
-        return headers;
     }
 });
 

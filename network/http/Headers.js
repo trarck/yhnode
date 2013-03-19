@@ -1,22 +1,10 @@
-////////////////////////////////////////////////////////////////////////////////
-/**
- *  @author:    Mizuno Takaaki
- *  Website:    https://developer.mobage.com/
- *  Copyright:  (C) 2011-2012 ngmoco:) inc. All rights reserved.
- */
-////////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////
-// Require Block
-var Class             = require('../../../Foundation/Class').Class;
-var OrderedDictionary = require('../../../Foundation/OrderedDictionary').OrderedDictionary;
-var Cookies           = require('./Cookies').Cookies;
+var BaseObject = require('../../base/BaseObject').BaseObject;
+var Cookies=require('./Cookies').Cookies;
 
 
-var Headers = Class.subclass(
-/** @lends Service.Network.HTTP.Headers.prototype */
-{
+var Headers = BaseObject.extend({
     classname: 'Headers',
+
     _dateType: {
         "If-Modified-Since" : 1,
         "Last-Modified"     : 1
@@ -25,23 +13,11 @@ var Headers = Class.subclass(
         "Set-Cookie" : 1,
         "Cookie"     : 1
     },
-    /**
-     * @class Class represents HTTP request/response headers.
-     * @property {Number} length (readonly) Number of header. length is read only property.
-     * @property {String} userAgent User-Agent header value accessor.
-     * @property {String} contentType Content-Type header value accessor.
-     * @property {String} contentTypeCharset Encoding str for content-Type header value.
-     * @property {String} lastModified Last-Modified header value accessor.
-     * @property {String} ifModifiedSince If-Modified-Since header value accessor.
-     * @property {Boolean} contentIsText (readonly) It indicate the downloaded content is text or not.
-     * @property {Boolean} contentIsJSON (readonly) It indicate the downloaded content is JSON or not.
-     * @property {Object} HTTP.Cookies object for Cookie header.
-     * @constructs
-     * @augments Core.Class
-     */
+
     initialize: function()
     {
-        this._dict = new OrderedDictionary();
+        this._dict ={};
+        this._length=0;
         this._cookies = new Cookies();
     },
     /**
@@ -51,7 +27,7 @@ var Headers = Class.subclass(
      */
     get: function(name)
     {
-        return this._dict.get(name);
+        return this._dict[name];
     },
     /**
      * Set header value specified by name. If the header is already exist, old value is replaced with new value. value can be String or Array.
@@ -60,18 +36,23 @@ var Headers = Class.subclass(
      */
     set: function(name, value)
     {
-        if( this._dateType[name] )
-        {
-            value = new Date(value);
+//        if( this._dateType[name] )
+//        {
+//            value = new Date(value);
+//        }
+//        else if ( this._cookieType[name] )
+//        {
+//            if( typeof value === 'object' && value instanceof Cookies )
+//            {
+//                value = value.toString();
+//            }
+//        }
+        if(typeof this._dict[name]=="undefined"){
+            ++this._length;
         }
-        else if ( this._cookieType[name] )
-        {
-            if( typeof value === 'object' && value instanceof Cookies )
-            {
-                value = value.toString();
-            }
-        }
-        this._dict.set(name, value);
+        this._dict[name]=value;
+
+        return this;
     },
     /**
      * Set header value specified by name. If the header is already exist, new value will add after the old values. old value is replaced with new value. Value can be String or Array.
@@ -80,20 +61,23 @@ var Headers = Class.subclass(
      */
     push: function(name, value)
     {
-        if( this._dateType[name] )
-        {
-            value = new Date(value);
-        }
-        var current = this._dict.get(name);
+//        if( this._dateType[name] )
+//        {
+//            value = new Date(value);
+//        }
+        var current = this._dict[name];
         if( !current )
         {
-            return this._dict.set(name, value);
+            this.set(name,value);
         }
         else if( typeof current === 'object' && current instanceof Array )
         {
-            return this._dict.set(name, current.push(value));
+            current.push(value);
+            this.set(name,current);
+        }else{
+            this.set(name,[current, value]);
         }
-        return this._dict.set(name, [current, value]);
+        return this;
     },
     /**
      * Remove header values specified with the name.
@@ -102,7 +86,9 @@ var Headers = Class.subclass(
      */
     remove: function(name)
     {
-        return this._dict.remove(name);
+        delete this._dict[name];
+        --this._length;
+        return this;
     },
     /**
      * Make an array of headers
@@ -111,14 +97,12 @@ var Headers = Class.subclass(
     toArray: function()
     {
         var i;
-        var keys = this._dict.keys;
-        var len = keys.length;
         var ret = [];
 
-        for(i=0; i<len; i++)
-        {
-            this._toArrayRec(ret, keys[i], this._dict.get(keys[i]));
+        for(var key in this._dict ){
+            this._toArrayRec(ret, key, this._dict[key]);
         }
+
         if( this._cookies && this._cookies.length > 0 )
         {
             ret.push( {key: "Cookie", value: this._cookies.toString()} );
@@ -127,7 +111,7 @@ var Headers = Class.subclass(
     },
     /**
      * Return all the headers as a formatted MIME header.
-     * @returns {String} formatted MIME header.
+     * @return string A string with all response this._headers separated by CR+LF
      */
     toString: function()
     {
@@ -139,17 +123,17 @@ var Headers = Class.subclass(
         for( i=0; i<len; i++ )
         {
 
-            str = str + array[i].key + ": "+array[i].value + "\n";
+            str = str + array[i].key + ": "+array[i].value + "\r\n";
         }
         return str;
     },
     get length()
     {
-        return this._dict.length;
+        return this._length;
     },
     set length(value)
     {
-        console.log("length is a read only property.");
+        console.warn("length is a read only property.");
     },
     get userAgent()
     {
@@ -224,7 +208,7 @@ var Headers = Class.subclass(
     },
     set contentIsText(value)
     {
-        console.log("contentIsText is a read only property.");
+        console.warn("contentIsText is a read only property.");
     },
     get contentIsJSON()
     {
@@ -233,7 +217,7 @@ var Headers = Class.subclass(
     },
     set contentIsJSON(value)
     {
-        console.log("contentIsJSON is a read only property.");
+        console.warn("contentIsJSON is a read only property.");
     },
     get cookies()
     {
@@ -246,7 +230,6 @@ var Headers = Class.subclass(
     // Private Functions
     _toArrayRec: function(array, key, value)
     {
-        NgLogD(key);
         var i;
         if( typeof value === 'object' )
         {

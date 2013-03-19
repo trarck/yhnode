@@ -1,20 +1,8 @@
-////////////////////////////////////////////////////////////////////////////////
-/**
- *  @author:    Mizuno Takaaki
- *  Website:    https://developer.mobage.com/
- *  Copyright:  (C) 2011-2012 ngmoco:) inc. All rights reserved.
- */
-////////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////
-// Require Block
-var Class             = require('../../../Foundation/Class').Class;
-var OrderedDictionary = require('../../../Foundation/OrderedDictionary').OrderedDictionary;
+var BaseObject = require('../../base/BaseObject').BaseObject;
 
 
-var Cookies = Class.subclass(
-/** @lends Service.Network.HTTP.Cookies.prototype */
-{
+var Cookies = BaseObject.extend({
+
     classname: 'Cookies',
     /**
      * @class Object to represent HTTP cookies.
@@ -42,7 +30,7 @@ var Cookies = Class.subclass(
         }
         else
         {
-            this._cookie = new OrderedDictionary();
+            this._cookie = {};
         }
     },
     /**
@@ -98,7 +86,7 @@ var Cookies = Class.subclass(
      */
     get: function(name)
     {
-        return this._cookie.get(name);
+        return this._cookie[name];
     },
     /**
      * Set cookie value of given name
@@ -107,7 +95,7 @@ var Cookies = Class.subclass(
      */
     set: function(name, value)
     {
-        this._cookie.set(name,value);
+        this._cookie[name]=value;
     },
     /**
      * Remove cookie value of given name
@@ -116,7 +104,7 @@ var Cookies = Class.subclass(
      */
     remove: function(name)
     {
-        return this._cookie.remove(name);
+        delete this._cookie[name];
     },
     get expire()
     {
@@ -169,7 +157,7 @@ var Cookies = Class.subclass(
         var i;
         var array = str.split(";");
         var reg = /\s*([^=]+)=\s*(.+)/;
-        this._cookie = new OrderedDictionary();
+        this._cookie = {};
         var len = array.length;
         for(i=0;i<len;i++)
         {
@@ -189,7 +177,7 @@ var Cookies = Class.subclass(
                     this._domain = value;
                     break;
                 default:
-                    this._cookie.set(key, value);
+                    this.set(key, value);
                     break;
                 }
             }
@@ -214,10 +202,15 @@ var Cookies = Class.subclass(
         {
             len = 1;
         }
-        for( i=0; i<len; i++ )
-        {
-            array.push(cookies.getKeyByIndex(i)+"="+cookies.getByIndex(i));
+        i=0;
+        for(var name in cookies){
+            if(i++<len){
+                array.push(name+"="+cookies[name]);
+            }else{
+                break;
+            }
         }
+
         if( needattr )
         {
             if( this._expire )
