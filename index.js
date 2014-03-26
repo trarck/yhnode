@@ -10,5 +10,6 @@ module.exports={
 			XMLHttpRequest:require("./network/http/XMLHttpRequest").XMLHttpRequest
 		},
 		Download:require("./network/Download").Download
-	}
+	},
+	async:require("./async/async")
 };
