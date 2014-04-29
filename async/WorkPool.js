@@ -25,9 +25,15 @@ var WorkPool=function(limit,name){
     this._isComplete=false;
     this._limit=limit||WorkPoolLimit;
     this._name=name;
+	this._stopOnError=false;
+	this._running=true;
 };
 
 WorkPool.prototype.taskIdIndex=1;
+
+WorkPool.prototype.setStopOnError=function(value){
+	this._stopOnError=value;
+}
 
 WorkPool.prototype.finishTaskWithId=function(taskId){
     delete this._runningTasks[taskId];
@@ -39,6 +45,18 @@ WorkPool.prototype.finishTask=function(task){
     delete this._runningTasks[task.getId()];
     this._runningTasksLength--;
     this._continue();
+};
+
+WorkPool.prototype.errorTask=function(task){
+	//
+    delete this._runningTasks[task.getId()];
+    this._runningTasksLength--;
+	if (this._stopOnError) {
+		this._stop();
+	}else{
+		this._continue();
+	}
+    
 };
 
 WorkPool.prototype.add=function(fun,scope){
@@ -59,6 +77,7 @@ WorkPool.prototype.add=function(fun,scope){
         this._pendingTasksLength++;
     }
 };
+
 /**
  * 所有任务完成时执行
  * @param fun
@@ -79,20 +98,24 @@ WorkPool.prototype.join=function(fun,scope){
 
 
 WorkPool.prototype._continue=function(){
+	//如果整个工作池停止，则不在继续任务。
+	if(!this._running) return;
+	
 //    console.log("continue:",this._pendingTasksLength,this._runningTasksLength);
     if(this._pendingTasksLength>0 && this._runningTasksLength<this._limit){
         var i=this._runningTasksLength,task;
         for(var taskId in this._pendingTasks){
             task=this._pendingTasks[taskId];
             this._runningTasks[taskId]=task;
-            task.run();
             delete this._pendingTasks[taskId];
             this._pendingTasksLength--;
             this._runningTasksLength++;
+			task.run();
             if(++i>=this._limit) break;
         }
 //        console.log("cotinue end",this._runningTasksLength);
     }
+	
     if(this._pendingTasksLength==0 && this._runningTasksLength==0){
         this._complete();
     }
@@ -104,6 +127,14 @@ WorkPool.prototype._complete=function(){
         act.action.apply(act.content,act.args);
     }
     this._isComplete=true;
+};
+
+WorkPool.prototype._stop=function(){
+    for(var i= 0,l=this._joinActions.length;i<l;i++){
+        var act=this._joinActions[i];
+        act.action.apply(act.content,act.args);
+    }
+    this._isComplete=false;
 };
 
 WorkPool.PoolLimit=WorkPoolLimit;

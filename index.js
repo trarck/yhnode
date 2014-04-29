@@ -11,5 +11,8 @@ module.exports={
 		},
 		Download:require("./network/Download").Download
 	},
-	async:require("./async/async")
+	async:require("./async/async"),
+	filesystem:{
+		Path:require("./filesystem/Path").Path
+	}
 };

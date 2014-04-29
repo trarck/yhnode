@@ -14,8 +14,13 @@ Task.prototype.run=function(){
 //    console.log("[Task] run "+this._id);
     this._action.apply(this._scope,this._args);
 };
+
 Task.prototype.done=function(){
     this._container.finishTask(this);
+};
+
+Task.prototype.error=function(){
+    this._container.errorTask(this);
 };
 
 Task.prototype.setId=function(id){
