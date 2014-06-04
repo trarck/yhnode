@@ -14,5 +14,9 @@ module.exports={
 	async:require("./async/async"),
 	filesystem:{
 		Path:require("./filesystem/Path").Path
+	},
+	io:{
+		InputStream:require("./io/InputStream").InputStream,
+		OutputStream:require("./io/OutputStream").OutputStream
 	}
 };
