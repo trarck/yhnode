@@ -1,5 +1,8 @@
 var BaseObject = require('../../base/BaseObject').BaseObject;
 
+var Headers=require('./Headers').Headers;
+var Cookies=require('./Cookies').Cookies;
+
 var ResponseType={
     ArrayBuffer:"arraybuffer",
     Blob:"blob",
@@ -11,6 +14,7 @@ var ResponseType={
 var Response = BaseObject.extend({
 
     classname: 'Response',
+	
     /**
      * @class class description
      * @example sample code
@@ -28,26 +32,95 @@ var Response = BaseObject.extend({
      */
     initialize: function(response)
     {
-        this._originalResponse=response;
-
         this._overrideMimeType=null;
+		
         this._overrideCharset=null;
 
-        this._responseText="";
+		this._dataSize=0;
+		
+		this._responseBuffer=null;
+		
         this._type=ResponseType.Text;
+		
+		this._defaultEncode="utf8";
+		
+		if(response){
+	        this._originalResponse=response;
+		
+			this._headers=this.createHeadersFromData(response.headers);
+			this._cookies=new Cookies();
+		
+		
+			this.parseCookies(response.headers);
+		}
     },
 
-    overrideMimeType:function(mime){
-        var mimes=mime.split(";");
-        this._overrideMimeType=mimes[0];
-        var charset=mimes[1];
+	createHeadersFromData:function(data){
+		var headers=new Headers();
+		for (var key in data) {
+			headers.set(key,data[key]);
+		}
+		return headers;
+	},
+
+    getHeaders:function()
+    {
+        return this._originalResponse.headers;
+    },
+		
+	getCookies:function(){
+		return this._cookies;
+	},
+	
+	parseCookies:function(headers){
+		var cookies=this.getCookesDataFromHeader(headers);
+		if (cookies) {
+			if (cookies instanceof Array) {
+				for(var i in cookies){
+					this._cookies.addCookie(cookies[i]);
+				}
+			}else{
+				this._cookies.addCookie(cookies);
+			}			
+		}
+	},
+	
+	getCookesDataFromHeader:function(headers){
+		for(var key in headers){
+			if (key.toLowerCase().indexOf("set-cookie")==0) {
+				return headers[key];
+			}
+		}		
+		return null;
+	},
+	
+    overrideContentType:function(contentType){
+        var cts=contentType.split(";");
+        this._overrideMimeType=cts[0];
+        var charset=cts[1];
         if(charset){
             var charsets=charset.split("=");
             this._overrideCharset=charsets[1];
         }
     },
 
-    get mimeType(){
+    setOverrideMimeType:function(overrideMimeType){
+        this._overrideMimeType=overrideMimeType;
+    },
+
+    setOverrideCharset:function(overrideCharset){
+        this._overrideCharset=overrideCharset;
+    },
+	
+	setDefaultEncode:function(encode){
+		this._defaultEncode=encode;
+	},
+	
+	getDefaultEncode:function(){
+		return this._defaultEncode;
+	},
+	
+    getMimeType:function(){
         if(this._overrideMimeType){
             return this._overrideMimeType;
         }else{
@@ -57,26 +130,23 @@ var Response = BaseObject.extend({
         }
     },
 
-    get charset(){
+    getCharset:function(){
         if(this._overrideCharset){
             return this._overrideCharset;
         }else{
             var ct=this._headers['Content-Type'];
             var mimes=ct.split(';');
-            return mimes[1];
+	        var charset=mimes[1];
+	        if(charset){
+	            var charsets=charset.split("=");
+	            return charsets[1];
+	        }
+            return "";
         }
     },
 
-    set overrideMimeType(overrideMimeType){
-        this._overrideMimeType=overrideMimeType;
-    },
-
-    set overrideCharset(overrideCharset){
-        this._overrideCharset=overrideCharset;
-    },
-
-    get encoding(){
-        var encoding="utf8";
+    getEncoding:function(){
+        var encoding=this._defaultEncode;
         switch(this._overrideCharset.toLowerCase()){
             case "utf-8":
                 encoding="utf8";
@@ -92,18 +162,15 @@ var Response = BaseObject.extend({
      * @field
      * @type String
      */
-    get responseText()
+    getResponseText:function()
     {
-        return this._responseText;
+        return this._responseBuffer?this._responseBuffer.toString(this.getEncoding()):"";
     },
-    set responseText(value)
-    {
-        console.log("HTTP.Response: responseText is a read only property.");
-    },
-    get responseJSON()
+
+    getResponseJSON:function()
     {
         try {
-            return JSON.parse(this._responseText);
+            return JSON.parse(this.getResponseText());
         }
         catch (err)
         {
@@ -111,33 +178,27 @@ var Response = BaseObject.extend({
             return undefined;
         }
     },
-    set responseJSON(value)
-    {
-        console.log("HTTP.Response: responseJSON is a read only property.");
-    },
-    get isText()
+		
+	getDataSize:function(){
+		return this._dataSize;
+	},
+	
+	setDataSize:function(size){
+		this._dataSize=size;
+	},
+	
+	setResponseBuffer:function(buffer){
+		this._responseBuffer=buffer;
+	},
+	
+    isText:function()
     {
         return this._type==ResponseType.Text;
     },
-    set isText(value)
-    {
-        console.log("HTTP.Response: isText is a read only property.");
-    },
-    get isJSON()
+	
+    isJSON:function()
     {
         return this._type==ResponseType.Json;
-    },
-    set isJSON(value)
-    {
-        console.log("HTTP.Response: isJSON is a read only property.");
-    },
-    get headers()
-    {
-        return this._originalResponse.headers;
-    },
-    set headers(value)
-    {
-        console.log("HTTP.Response: headers is a read only property.");
     }
 });
 

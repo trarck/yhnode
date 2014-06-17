@@ -7,6 +7,7 @@ var urlParse = require("url").parse;
 var events = require("events");
 
 var Headers=require('./Headers').Headers;
+var Response=require("./Response").Response;
 
 var defaultHeaders = {
     "User-Agent":"HttpRequest",
@@ -64,21 +65,25 @@ var HttpStatus = {
     DONE:4
 };
 
-var HttpRequest = BaseObject.extend({
+var Request = BaseObject.extend({
 
-    classname:'HttpRequest',
+    classname:'Request',
 
     readyState:HttpStatus.UNSENT,
 
-    responseText:"",
-
-    responseXML:"",
+    errorStack:"",
 
     status:null,
 
     statusText:null,
 
     _disableHeaderCheck:true,
+	
+	//强制response使用的编码类型
+	_forceResponseEncode:null,
+	
+	_defaultResponseEncode:"utf8",
+	
     /**
      * like XMLHttpRequest
      */
@@ -92,32 +97,27 @@ var HttpRequest = BaseObject.extend({
 
         this._settings={};
 
+		//node request
         this._request=null;
 
         this._response=null;
+		
+		this._receiveDataHandle=this.receiveData;
 
     },
-
-    open:function (method, url, async, user, password) {
-        this.abort();
-        this._errorFlag = false;
-
-        // Check for valid request method
-        if (!HttpRequest.isAllowedHttpMethod(method)) {
-            throw "HttpRequest: Request method not allowed";
-            return;
-        }
-
-        this._settings = {
-            "method":method,
-            "url":url.toString(),
-            "async":(typeof async !== "boolean" ? true : async),
-            "user":user || null,
-            "password":password || null
-        };
-
-        this.setState(HttpStatus.OPENED);
-    },
+	
+	createHeadersFromData:function(data){
+		var headers=new Headers();
+		for (var key in data) {
+			headers.set(key,data[key]);
+		}
+		return headers;
+	},
+	
+	getHeaders:function(){
+		return this._headers;
+	},
+	
     /**
      * Sets a header for the request.
      *
@@ -132,12 +132,26 @@ var HttpRequest = BaseObject.extend({
         if (this._sendFlag) {
             throw "INVALID_STATE_ERR: send flag is true";
         }
-        if (!this._disableHeaderCheck && HttpRequest.isAllowedHttpHeader(header)) {
+        if (!this._disableHeaderCheck && Request.isAllowedHttpHeader(header)) {
             console.warn('Refused to set unsafe header "' + header + '"');
             return;
         }
 
-        this._headers.push(header,value);
+        this._headers.set(header,value);
+    },
+	
+    /**
+     * Gets a request header
+     *
+     * @param string name Name of header to get
+     * @return string Returns the request header or empty string if not set
+     */
+    getRequestHeader:function (name) {
+        if (typeof name === "string" && this._headers.get(name)) {
+            var value=this._headers[name];
+            return value instanceof Array?value.join(", "):value;
+        }
+        return "";
     },
 
     /**
@@ -149,12 +163,10 @@ var HttpRequest = BaseObject.extend({
     getResponseHeader:function (header) {
         if (typeof header === "string"
             && this.readyState > HttpStatus.OPENED
-            && this._response.headers[header.toLowerCase()]
             && !this._errorFlag
             ) {
-            return this._response.headers[header.toLowerCase()];
+            return this._response.getHeaders().get(header.toLowerCase());
         }
-
         return null;
     },
 
@@ -167,55 +179,62 @@ var HttpRequest = BaseObject.extend({
         if (this.readyState < HttpStatus.HEADERS_RECEIVED || this._errorFlag) {
             return "";
         }
-        var result = "";
-
-        for (var i in this._response.headers) {
-            // Cookie this._headers are excluded
-            if (i !== "set-cookie" && i !== "set-cookie2") {
-                result += i + ": " + this._response.headers[i] + "\r\n";
-            }
-        }
-        return result.substr(0, result.length - 2);
+        return this._response.getHeaders().toString();
     },
 
-    /**
-     * Gets a request header
-     *
-     * @param string name Name of header to get
-     * @return string Returns the request header or empty string if not set
-     */
-    getRequestHeader:function (name) {
-        if (typeof name === "string" && this._headers[name]) {
-            var value=this._headers[name];
-            return value instanceof Array?value.join(", "):value;
-        }
-
-        return "";
-    },
-
-    overrideMimeType:function(mime){
+	/**
+	 * 有些时候response的content-type和body不符，需要手动设置
+	 */
+    overrideContentType:function(contentType){
         if (this.readyState == HttpStatus.LOADING || this.readyState==HttpStatus.DONE) {
             throw "INVALID_STATE_ERR: overrideMimeType can only be called when state is OPEN";
         }
-        this._overrideMimeType=mime;
+        this._overrideContentType=contentType;
     },
 
+    open:function (method, url, async, user, password) {
+		
+        this.abort();
+        
+		this._errorFlag = false;
+
+        // Check for valid request method
+        if (!Request.isAllowedHttpMethod(method)) {
+            throw "HttpRequest: Request method not allowed";
+            return;
+        }
+
+        this._settings = {
+            "method":method,
+            "url":url.toString(),
+            "async":(typeof async !== "boolean" ? true : async),
+            "user":user || null,
+            "password":password || null
+        };
+
+        this.setState(HttpStatus.OPENED);
+		
+		this.connect();
+    },
+	
     /**
-     * Sends the request to the server.
+     * connet the request to the server.
      *
      * @param string data Optional data to send as request body.
      */
-    send:function (data) {
+    connect:function () {
         var self=this;
+		
         if (this.readyState != HttpStatus.OPENED) {
-            throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");
+            throw new Error("INVALID_STATE_ERR: connection must be opened before connect() is called");
         }
 
-        if (this._sendFlag) {
-            throw new Error("INVALID_STATE_ERR: send has already been called");
-        }
+        // if (this._sendFlag) {
+        //     throw new Error("INVALID_STATE_ERR: connect has already been called");
+        // }
 
         var ssl = false, local = false;
+		
         var url = urlParse(this._settings.url);
 
         // Determine the server
@@ -242,29 +261,8 @@ var HttpRequest = BaseObject.extend({
 
         // Load files off the local filesystem (file://)
         if (local) {
-            if (this._settings.method !== "GET") {
-                throw "XMLHttpRequest: Only GET method is supported";
-            }
-
-            if (this._settings.async) {
-                fs.readFile(url.pathname, 'utf8', function (error, data) {
-                    if (error) {
-                        self.handleError(error);
-                    } else {
-                        self.status = 200;
-                        self.responseText = data;
-                        self.setState(HttpStatus.DONE);
-                    }
-                });
-            } else {
-                try {
-                    this.responseText = fs.readFileSync(url.pathname, 'utf8');
-                    this.status = 200;
-                    this.setState(HttpStatus.DONE);
-                } catch (e) {
-                    this.handleError(e);
-                }
-            }
+			
+            this.getDataFromLocal();
 
             return;
         }
@@ -276,9 +274,9 @@ var HttpRequest = BaseObject.extend({
         var uri = url.pathname + (url.search ? url.search : '');
 
         // Set the Host header or the server may reject the request
-        this._headers["Host"] = host;
+        this._headers.set("Host",host);
         if (!((ssl && port === 443) || port === 80)) {
-            this._headers["Host"] += ':' + url.port;
+            this._headers.set("Host", this._headers.get("Host")+= ':' + url.port);
         }
 
         // Set Basic Auth if necessary
@@ -287,22 +285,23 @@ var HttpRequest = BaseObject.extend({
                 this._settings.password = "";
             }
             var authBuf = new Buffer(this._settings.user + ":" + this._settings.password);
-            this._headers["Authorization"] = "Basic " + authBuf.toString("base64");
+            this._headers.push("Authorization","Basic " + authBuf.toString("base64"));
         }
 
         // Set content length header
         if (this._settings.method === "GET" || this._settings.method === "HEAD") {
             data = null;
         } else if (data) {
-            this._headers["Content-Length"] = Buffer.byteLength(data);
+            this._headers.set("Content-Length", Buffer.byteLength(data));
 
-            if (!this._headers["Content-Type"]) {
-                this._headers["Content-Type"] = "text/plain;charset=UTF-8";
-            }
+            // if (!this._headers["Content-Type"]) {
+            //     this._headers.push("Content-Type","text/plain;charset=UTF-8");
+            // }
+			
         } else if (this._settings.method === "POST") {
             // For a post with no data set Content-Length: 0.
             // This is required by buggy servers that don't meet the specs.
-            this._headers["Content-Length"] = 0;
+            this._headers.set("Content-Length",0);
         }
 
         var options = {
@@ -310,7 +309,7 @@ var HttpRequest = BaseObject.extend({
             port:port,
             path:uri,
             method:this._settings.method,
-            headers:this._headers,
+            headers:this._headers.toObject(),
             agent:false
         };
 
@@ -323,110 +322,132 @@ var HttpRequest = BaseObject.extend({
             var doRequest = ssl ? https.request : http.request;
 
             // Request is being sent, set send flag
-            this._sendFlag = true;
+            // this._sendFlag = true;
 
             // As per spec, this is called here for historical reasons.
-            self.dispatchEvent("readystatechange");
+            // self.dispatchEvent("readystatechange");
 
             // Create the request
             this._request = doRequest(options,
                 function (resp) {
-
-                    self._response = resp;
-
-                    var encoding="utf8";
-                    if(self._overrideMimeType) {
-                        resp.headers['Content-Type']=self._overrideMimeType;
-                        encoding=self.getResponseEncoding();
-                    }
-
-                    resp.setEncoding(encoding);
-
-                    this.setState(HttpStatus.HEADERS_RECEIVED);
-
-                    self.status = resp.statusCode;
-
-                    resp.on('data', function (chunk) {
-                        // Make sure there's some data
-                        if (chunk) {
-                            self.responseText += chunk;
-                        }
-                        // Don't emit state changes if the connection has been aborted.
-                        if (self._sendFlag) {
-                            self.setState(HttpStatus.LOADING);
-                        }
-                    });
-
-                    resp.on('end', function () {
-                        if (self._sendFlag) {
-                            // Discard the 'end' event if the connection has been aborted
-                            self.setState(HttpStatus.DONE);
-                            self._sendFlag = false;
-                        }
-                    });
-
-                    resp.on('error', function (error) {
-                        self.handleError(error);
-                    });
-                }).on('error', function (error) {
-                    self.handleError(error);
-                });
-
-            // Node 0.4 and later won't accept empty data. Make sure it's needed.
-            if (data) {
-                this._request.write(data);
-            }
-
-            this._request.end();
-
-            this.dispatchEvent("loadstart");
+					self._receiveDataHandle.call(self,resp)
+                }
+			).on('error', function (error) {
+               self.handleError(error);
+            });
+			
         } else { // Synchronous
-//            // Create a temporary file for communication with the other Node process
-//            var syncFile = ".node-xmlhttprequest-sync-" + process.pid;
-//            fs.writeFileSync(syncFile, "", "utf8");
-//            // The async request the other Node process executes
-//            var execString = "var http = require('http'), https = require('https'), fs = require('fs');"
-//                + "var doRequest = http" + (ssl ? "s" : "") + ".request;"
-//                + "var options = " + JSON.stringify(options) + ";"
-//                + "var responseText = '';"
-//                + "var req = doRequest(options, function(response) {"
-//                + "response.setEncoding('utf8');"
-//                + "response.on('data', function(chunk) {"
-//                + "responseText += chunk;"
-//                + "});"
-//                + "response.on('end', function() {"
-//                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-STATUS:' + response.statusCode + ',' + responseText, 'utf8');"
-//                + "});"
-//                + "response.on('error', function(error) {"
-//                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-ERROR:' + JSON.stringify(error), 'utf8');"
-//                + "});"
-//                + "}).on('error', function(error) {"
-//                + "fs.writeFileSync('" + syncFile + "', 'NODE-XMLHTTPREQUEST-ERROR:' + JSON.stringify(error), 'utf8');"
-//                + "});"
-//                + (data ? "req.write('" + data.replace(/'/g, "\\'") + "');" : "")
-//                + "req.end();";
-//            // Start the other Node Process, executing this string
-//            syncProc = spawn(process.argv[0], ["-e", execString]);
-//            while ((self.responseText = fs.readFileSync(syncFile, 'utf8')) == "") {
-//                // Wait while the file is empty
-//            }
-//            // Kill the child process once the file has data
-//            syncProc.stdin.end();
-//            // Remove the temporary file
-//            fs.unlinkSync(syncFile);
-//            if (self.responseText.match(/^NODE-XMLHTTPREQUEST-ERROR:/)) {
-//                // If the file returned an error, handle it
-//                var errorObj = self.responseText.replace(/^NODE-XMLHTTPREQUEST-ERROR:/, "");
-//                self.handleError(errorObj);
-//            } else {
-//                // If the file returned okay, parse its data and move to the DONE state
-//                self.status = self.responseText.replace(/^NODE-XMLHTTPREQUEST-STATUS:([0-9]*),.*/, "$1");
-//                self.responseText = self.responseText.replace(/^NODE-XMLHTTPREQUEST-STATUS:[0-9]*,(.*)/, "$1");
-//                this.setState(HttpStatus.DONE);
-//            }
+			
         }
     },
+	
+    /**
+     * Sends the request to the server.
+     *
+     * @param string data Optional data to send as request body.
+     */
+    send:function (data) {	
+		if(data){
+	        if (this.readyState != HttpStatus.OPENED) {
+	            throw new Error("INVALID_STATE_ERR: connection must be opened before send() is called");
+	        }
 
+	        this._request.write(data);
+		}
+    },
+	
+	end:function(){
+		if (this.readyState == HttpStatus.OPENED) {
+			this._request.end();
+		}
+	},
+	
+	getDataFromLocal:function(){
+		
+        if (this._settings.method !== "GET") {
+            throw "HttpRequest: Only GET method is supported";
+        }
+
+        if (this._settings.async) {
+            fs.readFile(url.pathname, this._forceResponseEncode || this._defaultResponseEncode, function (error, buffer) {
+                if (error) {
+                    self.handleError(error);
+                } else {
+                    self.status = 200;
+					self._response=new Response();
+					self._response.setDataSize(buffer.length);
+					self._response.setResponseBuffer(buffer);
+                    self.setState(HttpStatus.DONE);
+                }
+            });
+        } else {
+            try {
+                var buffer = fs.readFileSync(url.pathname, this._forceResponseEncode || this._defaultResponseEncode);
+				this.status = 200;
+				this._response=new Response();
+				this._response.setDataSize(buffer.length);
+				this._response.setResponseBuffer(buffer);
+                this.setState(HttpStatus.DONE);
+            } catch (e) {
+                this.handleError(e);
+            }
+        }
+	},
+
+	setReceiveDataHandle:function(handle){
+		this._receiveDataHandle=handle;
+	},
+	
+	receiveData:function(resp){
+		var self=this;
+        this._response = new Response(resp);
+
+        if(this._overrideContentType) {
+            this._response.overrideContentType(this._overrideContentType);
+        }
+		
+        var encoding = this._forceResponseEncode || this._defaultResponseEncode;   
+
+        this._response.setOverrideCharset(encoding);
+
+        this.setState(HttpStatus.HEADERS_RECEIVED);
+
+        this.status = resp.statusCode;
+
+		var buffers = [], size = 0;
+
+        resp.on('data', function (chunk) {
+            // Make sure there's some data
+            if (chunk) {
+                buffers.push(chunk);
+                size += chunk.length;
+				self._response.setDataSize(size); 
+            }
+			
+            // Don't emit state changes if the connection has been aborted.
+
+           self.setState(HttpStatus.LOADING);
+
+        });
+
+        resp.on('end', function () {
+            var buffer = new Buffer(size), pos = 0;
+            for (var i = 0, l = buffers.length; i < l; i++) {
+                buffers[i].copy(buffer, pos);
+                pos += buffers[i].length;
+            }
+			
+			self._response.setResponseBuffer(buffer);
+			
+            self.setState(HttpStatus.DONE);
+    
+        });
+
+        resp.on('error', function (error) {
+            self.handleError(error);
+        });
+			
+	},
 
     /**
      * Called when an error is encountered to deal with it.
@@ -434,9 +455,10 @@ var HttpRequest = BaseObject.extend({
     handleError:function (error) {
         this.status = 503;
         this.statusText = error;
-        this.responseText = error.stack;
+        this.errorStack = error.stack;
         this._errorFlag = true;
         this.setState(HttpStatus.DONE);
+		this.dispatchEvent("error");
     },
 
     /**
@@ -448,9 +470,9 @@ var HttpRequest = BaseObject.extend({
             this._request = null;
         }
 
-        this._headers = defaultHeaders;
-        this.responseText = "";
-        this.responseXML = "";
+        this._headers = this.createHeadersFromData();
+		
+        this.errorStack = "";
 
         this._errorFlag = true;
 
@@ -506,13 +528,14 @@ var HttpRequest = BaseObject.extend({
             this.readyState = state;
 
             if (this._settings.async || this.readyState < HttpStatus.OPENED || this.readyState === HttpStatus.DONE) {
-                this.dispatchEvent("readystatechange");
+				this.dispatchEvent("readystatechange");
             }
 
-            if (this.readyState === HttpStatus.DONE && !this._errorFlag) {
-                this.dispatchEvent("load");
-                // @TODO figure out InspectorInstrumentation::didLoadXHR(cookie)
-                this.dispatchEvent("loadend");
+            if (this.readyState === HttpStatus.DONE) {
+				if(!this._errorFlag){
+					this.dispatchEvent("success");
+				}
+                this.dispatchEvent("complete");
             }
         }
     },
@@ -529,7 +552,7 @@ var HttpRequest = BaseObject.extend({
     getResponseEncoding:function(){
         var encoding="utf8";
 
-        var mimes=this._overrideMimeType.split(";");
+        var mimes=this._overrideContentType.split(";");
         var charset=mimes[1];
         if(charset){
             var charsets=charset.split("=");
@@ -545,6 +568,26 @@ var HttpRequest = BaseObject.extend({
 
         return encoding;
     },
+	
+	getResponse:function(){
+		return this._response;
+	},
+	
+	setForceResponseEncode:function(val){
+		this._forceResponseEncode=val;
+	},
+	
+	getForceResponseEncode:function(){
+		return this._forceResponseEncode;
+	},
+	
+	setDefaultResponseEncode:function(val){
+		this._defaultResponseEncode=val;
+	},
+	
+	getDefaultResponseEncode:function(){
+		return this._defaultResponseEncode;
+	},
 
     get response(){
         return this._response;
@@ -558,5 +601,6 @@ var HttpRequest = BaseObject.extend({
     isAllowedHttpHeader : function(header) {
         return (header && forbiddenRequestHeaders.indexOf(header.toLowerCase()) === -1);
     }
-
 });
+
+exports.Request=Request;

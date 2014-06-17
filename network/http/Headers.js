@@ -1,16 +1,17 @@
 var BaseObject = require('../../base/BaseObject').BaseObject;
-var Cookies=require('./Cookies').Cookies;
-
 
 var Headers = BaseObject.extend({
+	
     classname: 'Headers',
 
     _dateType: {
         "If-Modified-Since" : 1,
         "Last-Modified"     : 1
     },
+	
     _cookieType: {
         "Set-Cookie" : 1,
+		"Set-Cookie2" : 1,
         "Cookie"     : 1
     },
 
@@ -18,7 +19,6 @@ var Headers = BaseObject.extend({
     {
         this._dict ={};
         this._length=0;
-        this._cookies = new Cookies();
     },
     /**
      * Get header value specified by name.  If the header has only one value, it returns String. If the header has more than 2 values, it returns Array.
@@ -29,6 +29,7 @@ var Headers = BaseObject.extend({
     {
         return this._dict[name];
     },
+	
     /**
      * Set header value specified by name. If the header is already exist, old value is replaced with new value. value can be String or Array.
      * @param {String} name the name of HTTP header
@@ -36,10 +37,10 @@ var Headers = BaseObject.extend({
      */
     set: function(name, value)
     {
-//        if( this._dateType[name] )
-//        {
-//            value = new Date(value);
-//        }
+       if( this._dateType[name] )
+       {
+           value = new Date(value);
+       }
 //        else if ( this._cookieType[name] )
 //        {
 //            if( typeof value === 'object' && value instanceof Cookies )
@@ -47,6 +48,12 @@ var Headers = BaseObject.extend({
 //                value = value.toString();
 //            }
 //        }
+		
+		// if(this._cookieType[name.toLowerCase()]){
+		// 	
+		// 	
+		// }
+		
         if(typeof this._dict[name]=="undefined"){
             ++this._length;
         }
@@ -79,6 +86,7 @@ var Headers = BaseObject.extend({
         }
         return this;
     },
+	
     /**
      * Remove header values specified with the name.
      * @param {String} name the name of HTTP header
@@ -103,12 +111,19 @@ var Headers = BaseObject.extend({
             this._toArrayRec(ret, key, this._dict[key]);
         }
 
-        if( this._cookies && this._cookies.length > 0 )
-        {
-            ret.push( {key: "Cookie", value: this._cookies.toString()} );
-        }
         return ret;
     },
+	
+	toObject:function(){
+        var i;
+        var ret = {};
+
+        for(var key in this._dict ){
+            this._toObjRec(ret, key, this._dict[key]);
+        }
+        return ret;
+	},
+	
     /**
      * Return all the headers as a formatted MIME header.
      * @return string A string with all response this._headers separated by CR+LF
@@ -122,33 +137,30 @@ var Headers = BaseObject.extend({
 
         for( i=0; i<len; i++ )
         {
-
-            str = str + array[i].key + ": "+array[i].value + "\r\n";
+            str = str + array[i].key + ": "+ (array[i].value instanceof Array ? array[i].value.join(", "):array[i].value) + "\r\n";
         }
         return str;
     },
-    get length()
+	
+    getLength:function()
     {
         return this._length;
     },
-    set length(value)
-    {
-        console.warn("length is a read only property.");
-    },
-    get userAgent()
+	
+    getUserAgent:function()
     {
         return this.get("User-Agent");
     },
-    set userAgent(value)
+    setUserAgent:function(value)
     {
         this.set("User-Agent", value);
     },
-    get contentType()
+    getContentType:function()
     {
         var ct = this._parseContentType(this.get("Content-Type"));
         return ct.type ? ct.type+"/"+ct.subtype : "";
     },
-    set contentType(value)
+    setCcontentType:function(value)
     {
         var newCt = this._parseContentType(value);
         var oldCt = this._parseContentType(this.get("Content-Type"));
@@ -166,12 +178,12 @@ var Headers = BaseObject.extend({
             this.set("Content-Type", newCtStr);
         }
     },
-    get contentTypeCharset()
+    getContentTypeCharset:function()
     {
         var ct = this._parseContentType(this.get("Content-Type"));
         return ct.charset ? ct.charset : "";
     },
-    set contentTypeCharset(value)
+    setCcontentTypeCharset:function(value)
     {
         var oldCt = this._parseContentType(this.get("Content-Type"));
         if( oldCt.type )
@@ -184,49 +196,34 @@ var Headers = BaseObject.extend({
             this.set("Content-Type", newCtStr);
         }
     },
-    get lastModified()
+    getLastModified:function()
     {
         this._getDateType("Last-Modified");
     },
-    set lastModified(value)
+    setLastModified:function(value)
     {
         this._setDateType("Last-Modified", value);
     },
-    get ifModifiedSince()
+    getIfModifiedSince:function()
     {
         this._getDateType("If-Modified-Since");
     },
-    set ifModifiedSince(value)
+    setIfModifiedSince:function(value)
     {
         this._setDateType("If-Modified-Since", value);
     },
-    get contentIsText()
+    getContentIsText:function()
     {
         var ct = this._parseContentType(this.get("Content-Type"));
         return ct.type    === 'text' ? true :
                ct.subtype === 'json' ? true : false;
     },
-    set contentIsText(value)
-    {
-        console.warn("contentIsText is a read only property.");
-    },
-    get contentIsJSON()
+    getContentIsJSON:function()
     {
         var ct = this._parseContentType(this.get("Content-Type"));
         return ct.subtype === 'json'  ? true : false;
     },
-    set contentIsJSON(value)
-    {
-        console.warn("contentIsJSON is a read only property.");
-    },
-    get cookies()
-    {
-        return this._cookies;
-    },
-    set cookies(value)
-    {
-        this._cookies = value;
-    },
+	
     // Private Functions
     _toArrayRec: function(array, key, value)
     {
@@ -255,6 +252,31 @@ var Headers = BaseObject.extend({
             array.push({ key: key, value: value});
         }
     },
+	
+    _toObjRec: function(obj, key, value)
+    {
+        var i;
+        if( typeof value === 'object' )
+        {
+            if( value instanceof Array )
+            {
+				obj[key]=value.join(", ");
+            }
+            else if( value instanceof Date )
+            {
+				obj[key]=value.toUTCString();
+            }
+            else if( value.toString )
+            {
+				obj[key]=value.toString()
+            }
+        }
+        else
+        {
+            obj[key]=value;
+        }
+    },
+	
     /** @private */
     _parseContentType: function(ct)
     {
