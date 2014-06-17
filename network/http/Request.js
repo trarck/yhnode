@@ -135,13 +135,13 @@ var Request = BaseObject.extend({
      * @param string value Header value
      */
     setRequestHeader:function (header, value) {
-        if (this.readyState != HttpStatus.OPENED) {
+        if (this.readyState != HttpStatus.UNSENT) {
             throw "INVALID_STATE_ERR: setRequestHeader can only be called when state is OPEN";
         }
         
-        if (this._sendFlag) {
-            throw "INVALID_STATE_ERR: send flag is true";
-        }
+        // if (this._sendFlag) {
+        //     throw "INVALID_STATE_ERR: send flag is true";
+        // }
         if (!this._disableHeaderCheck && Request.isAllowedHttpHeader(header)) {
             console.warn('Refused to set unsafe header "' + header + '"');
             return;
@@ -336,8 +336,6 @@ var Request = BaseObject.extend({
 			ssl=this._settings.ssl;
 			local=this._settings.local;
 		}
-		
-		console.log(options.headers);
         	
         // Reset error flag
         this._errorFlag = false;
@@ -508,9 +506,9 @@ var Request = BaseObject.extend({
         this._errorFlag = true;
 
         if (this.readyState !== HttpStatus.UNSENT
-            && (this.readyState !== HttpStatus.OPENED || this._sendFlag)
+            && (this.readyState !== HttpStatus.OPENED )//|| this._sendFlag)
             && this.readyState !== HttpStatus.DONE) {
-            this._sendFlag = false;
+            // this._sendFlag = false;
             this.setState(HttpStatus.DONE);
         }
         this.readyState = HttpStatus.UNSENT;
