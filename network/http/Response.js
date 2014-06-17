@@ -68,6 +68,11 @@ var Response = BaseObject.extend({
         return this._originalResponse.headers;
     },
 		
+	getOriginalResponse:function(){
+		
+		return this._originalResponse;
+	},
+	
 	getCookies:function(){
 		return this._cookies;
 	},
@@ -189,6 +194,10 @@ var Response = BaseObject.extend({
 	
 	setResponseBuffer:function(buffer){
 		this._responseBuffer=buffer;
+	},
+	
+	getResponseBuffer:function(){
+		return this._responseBuffer;
 	},
 	
     isText:function()

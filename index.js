@@ -8,7 +8,7 @@ module.exports={
 	network:{
 		http:{
 			Headers:require("./network/http/Headers").Headers,
-			Request:require("./network/http/Headers").Request,
+			Request:require("./network/http/Request").Request,
 			XMLHttpRequest:require("./network/http/XMLHttpRequest").XMLHttpRequest
 		},
 		Download:require("./network/Download").Download

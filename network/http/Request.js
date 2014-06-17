@@ -203,9 +203,7 @@ var Request = BaseObject.extend({
     },
 
     open:function (method, url, async, user, password) {
-		
-        this.abort();
-        
+		        
 		this._errorFlag = false;
 
         // Check for valid request method
@@ -213,14 +211,18 @@ var Request = BaseObject.extend({
             throw "HttpRequest: Request method not allowed";
             return;
         }
-
-        this._settings = {
-            "method":method,
-            "url":url.toString(),
-            "async":(typeof async !== "boolean" ? true : async),
-            "user":user || null,
-            "password":password || null
-        };
+		
+		if (typeof method=="object") {
+			this._settings = method;
+		}else{
+	        this._settings = {
+	            "method":method,
+	            "url":url.toString(),
+	            "async":(typeof async !== "boolean" ? true : async),
+	            "user":user || null,
+	            "password":password || null
+	        };
+		}
 
         this.setState(HttpStatus.OPENED);
 		
@@ -233,6 +235,7 @@ var Request = BaseObject.extend({
      * @param string data Optional data to send as request body.
      */
     connect:function () {
+		
         var self=this;
 		
         if (this.readyState != HttpStatus.OPENED) {
@@ -243,112 +246,130 @@ var Request = BaseObject.extend({
         //     throw new Error("INVALID_STATE_ERR: connect has already been called");
         // }
 
-        var ssl = false, local = false;
+		var options;
+        var ssl = false, local = false;		
+	
+		if(!this._settings.options){
+			var host = "";
+			var port=0;
+			var uri="";
 		
-        var url = urlParse(this._settings.url);
+			if (this._settings.url) {
+				var url = urlParse(this._settings.url);
+		        // Determine the server
+		        switch (url.protocol) {
+		            case 'https:':
+		                ssl = true;
+		            // SSL & non-SSL both need host, no break here.
+		            case 'http:':
+		                host = url.hostname;
+		                break;
 
-        // Determine the server
-        switch (url.protocol) {
-            case 'https:':
-                ssl = true;
-            // SSL & non-SSL both need host, no break here.
-            case 'http:':
-                var host = url.hostname;
-                break;
+		            case 'file:':
+		                local = true;
+		                break;
 
-            case 'file:':
-                local = true;
-                break;
+		            case undefined:
+		            case '':
+		                host = "localhost";
+		                break;
 
-            case undefined:
-            case '':
-                var host = "localhost";
-                break;
-
-            default:
-                throw "Protocol not supported.";
-        }
-
-        // Load files off the local filesystem (file://)
-        if (local) {
+		            default:
+		                throw "Protocol not supported.";
+		        }
 			
-            this.getDataFromLocal();
-
-            return;
-        }
-
-        // Default to port 80. If accessing localhost on another port be sure
-        // to use http://localhost:port/path
-        var port = url.port || (ssl ? 443 : 80);
-        // Add query string if one is used
-        var uri = url.pathname + (url.search ? url.search : '');
-
-        // Set the Host header or the server may reject the request
-        this._headers.set("Host",host);
-        if (!((ssl && port === 443) || port === 80)) {
-            this._headers.set("Host", this._headers.get("Host")+= ':' + url.port);
-        }
-
-        // Set Basic Auth if necessary
-        if (this._settings.user) {
-            if (typeof this._settings.password == "undefined") {
-                this._settings.password = "";
-            }
-            var authBuf = new Buffer(this._settings.user + ":" + this._settings.password);
-            this._headers.push("Authorization","Basic " + authBuf.toString("base64"));
-        }
-
-        // Set content length header
-        if (this._settings.method === "GET" || this._settings.method === "HEAD") {
-            data = null;
-        } else if (data) {
-            this._headers.set("Content-Length", Buffer.byteLength(data));
-
-            // if (!this._headers["Content-Type"]) {
-            //     this._headers.push("Content-Type","text/plain;charset=UTF-8");
-            // }
+		        // Default to port 80. If accessing localhost on another port be sure
+		        // to use http://localhost:port/path
+		        port = url.port || (ssl ? 443 : 80);
+		        // Add query string if one is used
+		        uri = url.pathname + (url.search ? url.search : '');
+			}else{
+				host = this._settions.host;
+				port = this._settings.port;
+				uri = this._settings.uri;
+			}        
 			
-        } else if (this._settings.method === "POST") {
-            // For a post with no data set Content-Length: 0.
-            // This is required by buggy servers that don't meet the specs.
-            this._headers.set("Content-Length",0);
-        }
+			if(!local){
+		        // Set the Host header or the server may reject the request
+		        this._headers.set("Host",host);
+		
+		        if (!((ssl && port === 443) || port === 80)) {
+		            this._headers.set("Host", this._headers.get("Host")+= ':' + url.port);
+		        }
 
-        var options = {
-            host:host,
-            port:port,
-            path:uri,
-            method:this._settings.method,
-            headers:this._headers.toObject(),
-            agent:false
-        };
+		        // Set Basic Auth if necessary
+		        if (this._settings.user) {
+		            if (typeof this._settings.password == "undefined") {
+		                this._settings.password = "";
+		            }
+		            var authBuf = new Buffer(this._settings.user + ":" + this._settings.password);
+		            this._headers.push("Authorization","Basic " + authBuf.toString("base64"));
+		        }
 
+		        // // Set content length header
+		        // if (this._settings.method === "GET" || this._settings.method === "HEAD") {
+		        //     data = null;
+		        // } else if (data) {
+		        //     this._headers.set("Content-Length", Buffer.byteLength(data));
+		        // 
+		        //     // if (!this._headers["Content-Type"]) {
+		        //     //     this._headers.push("Content-Type","text/plain;charset=UTF-8");
+		        //     // }
+		        // 			
+		        // } else if (this._settings.method === "POST") {
+		        //     // For a post with no data set Content-Length: 0.
+		        //     // This is required by buggy servers that don't meet the specs.
+		        //     this._headers.set("Content-Length",0);
+		        // }
+
+		        options = {
+		            host:host,
+		            port:port,
+		            path:uri,
+		            method:this._settings.method,
+		            headers:this._headers.toObject(),
+		            agent:false
+		        };
+			}
+		}else{
+			options=this._settings.options;
+			ssl=this._settings.ssl;
+			local=this._settings.local;
+		}
+		
+		console.log(options.headers);
+        	
         // Reset error flag
         this._errorFlag = false;
 
-        // Handle async requests
-        if (this._settings.async) {
-            // Use the proper protocol
-            var doRequest = ssl ? https.request : http.request;
+        // Load files off the local filesystem (file://)
+        if (local) {
+            this.getDataFromLocal();
+        }else{
+         	// Handle async requests
+	        if (this._settings.async) {
+	            // Use the proper protocol
+	            var doRequest = ssl ? https.request : http.request;
 
-            // Request is being sent, set send flag
-            // this._sendFlag = true;
+	            // Request is being sent, set send flag
+	            // this._sendFlag = true;
 
-            // As per spec, this is called here for historical reasons.
-            // self.dispatchEvent("readystatechange");
+	            // As per spec, this is called here for historical reasons.
+	            // self.dispatchEvent("readystatechange");
 
-            // Create the request
-            this._request = doRequest(options,
-                function (resp) {
-					self._receiveDataHandle.call(self,resp)
-                }
-			).on('error', function (error) {
-               self.handleError(error);
-            });
+	            // Create the request
+	            this._request = doRequest(options,
+	                function (resp) {
+						self._receiveDataHandle.call(self,resp)
+	                }
+				).on('error', function (error) {
+	               self.handleError(error);
+	            });
 			
-        } else { // Synchronous
+	        } else { // Synchronous
 			
-        }
+	        }
+		}
     },
 	
     /**
@@ -367,7 +388,7 @@ var Request = BaseObject.extend({
     },
 	
 	end:function(){
-		if (this.readyState == HttpStatus.OPENED) {
+		if (this.readyState != HttpStatus.UNSENT) {
 			this._request.end();
 		}
 	},

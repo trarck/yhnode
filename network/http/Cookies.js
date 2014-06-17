@@ -137,13 +137,11 @@ var Cookies = BaseObject.extend({
      */
     initialize: function(str)
     {
+		this._cookies = {};
+		
         if( typeof str === 'string')
         {
             this._parseCookie(str);
-        }
-        else
-        {
-            this._cookies = {};
         }
     },
     /**
@@ -210,6 +208,17 @@ var Cookies = BaseObject.extend({
 				this.set(result[i].getName(),result[i]);
 			}
 		}
+	},
+	
+	mergeCookies:function(other){
+		var cookies=other.getCookies();
+		for(var k in cookies){
+			this.set(k,cookies[k]);
+		}
+	},
+	
+	getCookies:function(){
+		return this._cookies;
 	},
 	
     // get length(){
