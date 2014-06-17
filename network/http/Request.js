@@ -114,6 +114,16 @@ var Request = BaseObject.extend({
 		return headers;
 	},
 	
+	setHeadersData:function(data){
+		for (var key in data) {
+			this._headers.set(key,data[key]);
+		}
+	},
+	
+	setHeaders:function(headers){
+		this._headers=headers;
+	},
+	
 	getHeaders:function(){
 		return this._headers;
 	},
