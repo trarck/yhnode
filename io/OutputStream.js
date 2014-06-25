@@ -18,8 +18,18 @@ OutputStream.prototype= {
      * @param length
      */
     writeBytes: function(bytes,length) {
+		if (bytes instanceof Buffer) {
+			this.checkWriteable(length);
+			var len=bytes.copy(this.body,this.offset,0,length);
+			this.offset+=len;
+		}else{
+			this.writeString(bytes,length);
+		}
+    },
+	
+    writeString: function(str,length) {
 		this.checkWriteable(length);
-  	 	var len=this.body.write(bytes,this.offset,length);
+  	 	var len=this.body.write(str,this.offset,length);
 		this.offset+=len;
     },
 	
