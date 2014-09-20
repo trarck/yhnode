@@ -4,3 +4,4 @@ var WorkQueue=require('./WorkQueue').WorkQueue;
 exports.Task=Task;
 exports.WorkPool=WorkPool;
 exports.WorkQueue=WorkQueue;
+exports.asap=require("./asap");

@@ -56,7 +56,6 @@ WorkPool.prototype.errorTask=function(task){
 	}else{
 		this._continue();
 	}
-    
 };
 
 WorkPool.prototype.add=function(fun,scope){
