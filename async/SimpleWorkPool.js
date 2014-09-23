@@ -1,6 +1,6 @@
 var  Task=require("./Task").Task;
 var  WorkPool=require("./WorkPool").WorkPool;
-var Base=require("../core").Base;
+var Core=require("../base/Core").Core;
 
 /**
  * 工作池的一个子实现
@@ -10,7 +10,7 @@ var Base=require("../core").Base;
  * @constructor
  */
 
-var SimpleWorkPool=Base.Class(WorkPool,{
+var SimpleWorkPool=Core.Class(WorkPool,{
 	
 	classname:"SimpleWorkPool",
 	
