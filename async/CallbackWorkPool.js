@@ -16,7 +16,7 @@ var CallbackWorkPool=Base.Class(WorkPool,{
 	
 	add:function(fun,scope){
 		this._isComplete=false;
-	    var args=Array.prototype.slice.call(arguments,2);//the first for later use
+	    var args=Array.prototype.slice.call(arguments,2);
 	    var taskId=this.taskIdIndex++;
 		
 		// var originalCallback=args.pop();
