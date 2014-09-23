@@ -294,7 +294,7 @@ var Request = BaseObject.extend({
 		        this._headers.set("Host",host);
 		
 		        if (!((ssl && port === 443) || port === 80)) {
-		            this._headers.set("Host", this._headers.get("Host")+= ':' + url.port);
+		            this._headers.set("Host", this._headers.get("Host")+ ':' + url.port);
 		        }
 
 		        // Set Basic Auth if necessary
