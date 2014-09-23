@@ -269,7 +269,7 @@ InputStream.prototype= {
         return this.readNumber(4)/0x10000;//this.readFixedPoint(32, 16);
     },
 	
-	readString:function(encoding,length){
+	readString:function(length,encoding){
 		return this.body.toString(encoding,this.offset,this.offset+length);
 	},
 	
