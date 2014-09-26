@@ -20,5 +20,8 @@ module.exports={
 	io:{
 		InputStream:require("./io/InputStream").InputStream,
 		OutputStream:require("./io/OutputStream").OutputStream
+	},
+	promise:{
+		Promise:require("./promise/Promise")
 	}
 };

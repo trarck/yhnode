@@ -2,7 +2,7 @@ var len = 0;
 
 function asap(callback, arg) {
   queue[len] = callback;
-  queue[len + 1] = arg;
+  queue[len + 1] = Array.prototype.slice.call(arguments,1);
   len += 2;
   if (len === 2) {
     // If len is 1, that means that we need to schedule an async flush.
@@ -57,9 +57,9 @@ var queue = new Array(1000);
 function flush() {
   for (var i = 0; i < len; i+=2) {
     var callback = queue[i];
-    var arg = queue[i+1];
+    var args = queue[i+1];
 
-    callback(arg);
+    callback.apply(null,args);
 
     queue[i] = undefined;
     queue[i+1] = undefined;
@@ -81,4 +81,4 @@ if (typeof process !== 'undefined' && {}.toString.call(process) === '[object pro
   scheduleFlush = useSetTimeout();
 }
 
-module.exporpt=asap;
+module.exports=asap;
