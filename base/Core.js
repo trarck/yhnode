@@ -95,9 +95,9 @@ var Core={
                 var cName = Core.ucfirst(nsc.cName);
                 Class=nsc.ns[cName] = hasPrent?function(){
                     Class._superclass_.apply(this,arguments);
-					Class.prototype.initialize && Class.prototype.initialize.apply(Class.prototype,arguments);
+					Class.prototype.hasOwnProperty("initialize") && Class.prototype.initialize.apply(this,arguments);
                 }:function(){
-                	Class.prototype.initialize && Class.prototype.initialize.apply(Class.prototype,arguments);
+                	Class.prototype.hasOwnProperty("initialize") && Class.prototype.initialize.apply(this,arguments);
                 };
                 //命名空间
                 Class.namespace = nsc.ns;
@@ -107,10 +107,9 @@ var Core={
             case "undefined":
                 Class= hasPrent?function(){
                     Class._superclass_.apply(this,arguments);
-					Class.prototype.initialize && Class.prototype.initialize.apply(Class.prototype,arguments);
+					Class.prototype.hasOwnProperty("initialize") && Class.prototype.initialize.apply(this,arguments);
                 }:function(){
-                    Class.prototype.initialize.apply(Class.prototype,arguments);
-					Class.prototype.initialize && Class.prototype.initialize.apply(Class.prototype,arguments);
+					Class.prototype.hasOwnProperty("initialize") && Class.prototype.initialize.apply(this,arguments);
                 };
                 break;
             default:
