@@ -15,7 +15,8 @@ module.exports={
 	},
 	async:require("./async/async"),
 	filesystem:{
-		Path:require("./filesystem/Path").Path
+		Path:require("./filesystem/Path").Path,
+		Vistor:require("./filesystem/Vistor").Vistor
 	},
 	io:{
 		InputStream:require("./io/InputStream").InputStream,
@@ -23,5 +24,8 @@ module.exports={
 	},
 	promise:{
 		Promise:require("./promise/Promise")
+	},
+	express:{
+		Express:require("./express/Express")
 	}
 };
