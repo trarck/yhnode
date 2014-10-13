@@ -25,5 +25,5 @@ module.exports={
 	promise:{
 		Promise:require("./promise/Promise")
 	},
-	express:Express:require("./express/Express")
+	express:require("./express/Express")
 };
