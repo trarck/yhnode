@@ -1,7 +1,7 @@
 var Core=require('./Core').Core;
 
 var BaseObject=exports.BaseObject=function(){
-	this.initialize.apply(this,arguments);
+	BaseObject.prototype.initialize.apply(this,arguments);
 };
 BaseObject.prototype.initialize=function(){
 	
