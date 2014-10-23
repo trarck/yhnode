@@ -25,5 +25,8 @@ module.exports={
 	promise:{
 		Promise:require("./promise/Promise")
 	},
+	collections:{
+		SortData:require("./collections/SortData")
+	},
 	express:require("./express/Express")
 };
