@@ -3,7 +3,8 @@ module.exports={
 		Core:require("./base/Core").Core,
 		ArgParser:require("./base/ArgParser").ArgParser,
 		BaseObject:require("./base/BaseObject").BaseObject,
-		Accessor:require("./base/Accessor").Accessor
+		Accessor:require("./base/Accessor").Accessor,
+		String:require("./base/String")
 	},
 	network:{
 		http:{
