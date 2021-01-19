@@ -51,6 +51,13 @@ var EQExpress=Express.extend({
     }
 });
 
+var NEExpress=Express.extend({
+    classname: 'NEExpress',
+    test:function(val){
+        return this._exp!=val;
+    }
+});
+
 var LTExpress=Express.extend({
     classname: 'LTExpress',
     test:function(val){
@@ -85,6 +92,7 @@ exports.AndExpress=AndExpress;
 exports.OrExpress=OrExpress;
 
 exports.EQExpress=EQExpress;
+exports.NEExpress=NEExpress;
 exports.LTExpress=LTExpress;
 exports.LEExpress=LEExpress;
 exports.BTExpress=BTExpress;
