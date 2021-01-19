@@ -1,7 +1,7 @@
 
 var BaseObject = require('../base/BaseObject').BaseObject;
 
-var Express=yhnode.base.BaseObject.extend({
+var Express=BaseObject.extend({
     classname: 'Express',
     initialize: function (exp) {
         this._exp=exp;

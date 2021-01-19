@@ -6,9 +6,9 @@ var https= require('https');
 var url=require('url');
 var events = require("events");
 
-var HttpClient   = BaseObject.extend({
+var XMLHttpClient   = BaseObject.extend({
 
-    classname: 'HttpClient',
+    classname: 'XMLHttpClient',
     /**
      * @constructor
      * @augments Core.Class
@@ -24,7 +24,7 @@ var HttpClient   = BaseObject.extend({
      * @property {String} contentType The content type for the request body.
      * @property {Object} cookies Set HTTP.Cookies object to send cookies to server.
      * @property {Object} ifModifiedSince Date object for "If-modified-since" header to conditional request.
-     * @name Service.Network.HttpClient
+     * @name Service.Network.XMLHttpClient
      */
     initialize: function()
     {

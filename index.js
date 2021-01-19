@@ -3,7 +3,8 @@ module.exports={
 		Core:require("./base/Core").Core,
 		ArgParser:require("./base/ArgParser").ArgParser,
 		BaseObject:require("./base/BaseObject").BaseObject,
-		Accessor:require("./base/Accessor").Accessor
+		Accessor:require("./base/Accessor").Accessor,
+		String:require("./base/String")
 	},
 	network:{
 		http:{
@@ -16,7 +17,7 @@ module.exports={
 	async:require("./async/async"),
 	filesystem:{
 		Path:require("./filesystem/Path").Path,
-		Vistor:require("./filesystem/Vistor").Vistor
+		Visitor:require("./filesystem/Visitor").Visitor
 	},
 	io:{
 		InputStream:require("./io/InputStream").InputStream,
@@ -25,7 +26,8 @@ module.exports={
 	promise:{
 		Promise:require("./promise/Promise")
 	},
-	express:{
-		Express:require("./express/Express")
-	}
+	collections:{
+		SortData:require("./collections/SortData")
+	},
+	express:require("./express/Express")
 };

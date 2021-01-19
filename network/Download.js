@@ -185,8 +185,8 @@ var Download = BaseObject.extend({
     },
 
     doError:function(ex){
-        if(typeof this.onError=="function") this.onError(res);
-        this.emit("error",res);
+        if(typeof this.onError=="function") this.onError(ex);
+        this.emit("error",ex);
     }
 
 }, {

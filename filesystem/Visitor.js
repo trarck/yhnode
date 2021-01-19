@@ -2,9 +2,9 @@ var fs = require('fs');
 var path=require('path');
 var WorkPool = require("../async/WorkPool").WorkPool; 
 
-var Vistor=function(recursive){
+var Visitor=function(recursive){
     this._filters=[];
-	// «∑Ò¥¶¿Ì◊”ƒø¬º
+	//ÊòØÂê¶Â§ÑÁêÜÂ≠êÁõÆÂΩï
 	this._recursive=recursive;
 	this._workPool=new WorkPool();
 
@@ -12,30 +12,30 @@ var Vistor=function(recursive){
 	this._stepHandleScope=null;
 };
 
-Vistor.prototype.setHandle=function(handle,scope){
+Visitor.prototype.setHandle=function(handle,scope){
     this._stepHandle=handle;
 	this._stepHandleScope=scope||this;
 };
 
-Vistor.prototype.getHandle=function(){
+Visitor.prototype.getHandle=function(){
     return this._stepHandle;
 };
 
-Vistor.prototype.getHandleScope=function(){
+Visitor.prototype.getHandleScope=function(){
     return this._stepHandleScope;
 };
 
-Vistor.prototype.addFilter=function(filter){
+Visitor.prototype.addFilter=function(filter){
 	var index=this._filters.length;
     this._filters.push(filter);
 	return index;
 };
 
-Vistor.prototype.removeFilter=function(index){
+Visitor.prototype.removeFilter=function(index){
     this._filters.splice(index,1);
 };
 
-Vistor.prototype.test=function(val){
+Visitor.prototype.test=function(val){
     for(var i in this._filters){
         var filter=this._filters[i];
         if(!filter.test(val)){
@@ -45,7 +45,7 @@ Vistor.prototype.test=function(val){
     return true;
 };
 
-Vistor.prototype.parse=function(dir){
+Visitor.prototype.parse=function(dir){
     var files=fs.readdirSync(dir);
     var file;
 	
@@ -64,7 +64,7 @@ Vistor.prototype.parse=function(dir){
 };
 
 //canbe overite
-Vistor.prototype.doStep=function(task,file,srcDir){
+Visitor.prototype.doStep=function(task,file,srcDir){
 	var fullPath=path.join(srcDir,file);
 	var stat=fs.statSync(fullPath);
 	if(stat.isDirectory()){
@@ -86,4 +86,4 @@ Vistor.prototype.doStep=function(task,file,srcDir){
 	}
 };
 
-exports.Vistor=Vistor;
+exports.Visitor=Visitor;
